@@ -27,29 +27,54 @@ spec:
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       volumes:
-        - name: {{ include "solr-standalone.fullname" . }}-pv
+        - name: data
+          hostPath:
+            path: "/data/glusterfs/solr"
+            type: DirectoryOrCreate
       containers:
         - name: {{ .Chart.Name }}
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
-          command: {{ .Values.command }}
-          volumeMounts:
-            - mountPath: "/var/solr"
-              name: {{ include "solr-standalone.fullname" . }}-pv
+          {{- if .Values.solr.cores }}
+          command:
+            - /bin/bash
+            - -c
+          args:
+            - |
+              mkdir -p /var/solr/data && \
+              {{- $cores := .Values.solr.cores }}
+              {{- $cmd := "" }}
+              {{- range $index, $core := $cores }}
+                {{- if gt $index 0 }}
+                  {{- $cmd = printf "%s && precreate-core %s" $cmd $core }}
+                {{- else }}
+                  {{- $cmd = printf "precreate-core %s" $core }}
+                {{- end }}
+              {{- end }}
+              {{- $cmd = printf "%s && exec solr -f" $cmd }}
+              {{ $cmd }}
+          {{- end }}
+          #volumeMounts:
+          #  - mountPath: "/var/solr"
+          #    name: data
           ports:
             - name: http
-              containerPort: 80
+              containerPort: {{ .Values.service.port }}
               protocol: TCP
           livenessProbe:
             httpGet:
-              path: /
+              path: /solr
               port: http
+            initialDelaySeconds: 15
+            timeoutSeconds: 5
           readinessProbe:
             httpGet:
-              path: /
+              path: /solr
               port: http
+            initialDelaySeconds: 15
+            timeoutSeconds: 5
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
       {{- with .Values.nodeSelector }}

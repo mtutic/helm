@@ -11,7 +11,12 @@ image:
   tag: ""
 
 solr:
-  command: ["bash", "-c", "precreate-core epg && precreate-core people && precreate-core vod && exec solr -f"]
+  cores:
+    - epg
+    - people
+    - vod
+  #command: ["/bin/bash", "-c", "/opt/solr/docker/scripts/precreate-core epg && /opt/solr/docker/scripts/precreate-core people && /opt/solr/docker/scripts/precreate-core vod && exec solr -f"]
+  #command: ["/bin/bash", "-c", "'precreate-core people'"]
 
 dataMountPath: /data/solr
 
@@ -33,8 +38,10 @@ securityContext: {}
   # runAsUser: 1000
 
 service:
-  type: ClusterIP
+  type: NodePort
   port: 8983
+  targetPort: 8983
+  nodePort: 32083
 
 ingress:
   enabled: false
